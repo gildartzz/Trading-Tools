@@ -1,0 +1,61 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using cAlgo.API;
+using cAlgo.API.Collections;
+using cAlgo.API.Indicators;
+using cAlgo.API.Internals;
+
+namespace cAlgo.Robots
+{
+    [Robot(TimeZone = TimeZones.UTC, AccessRights = AccessRights.None)]
+    public class learn : Robot
+    {
+        [Parameter(DefaultValue = 0.0)]
+        public double Parameter { get; set; }
+        
+        //Create indicator variables
+        private AverageTrueRange atr;
+        private MacdCrossOver macd;
+
+        protected override void OnStart()
+        {
+            //Load indicators on startup
+            atr = Indicators.AverageTrueRange(14, MovingAverageType.Exponential);
+            macd = Indicators.MacdCrossOver(26,12,9);
+            
+           
+            
+        }
+
+        protected override void OnBar()
+        {
+            //Calculate trade amount
+            var PrevATR = Math.Round(atr.Result.Last(1)/Symbol.PipSize);
+            var TradeAmount = (Account.Equity*0.02)/(1.5*PrevATR*Symbol.PipValue);
+            TradeAmount = Symbol.NormalizeVolumeInUnits(TradeAmount, RoundingMode.Down);
+            
+            //Two Line cross
+            var MACDLine = macd.MACD.Last(1);
+            var PrevMACDLINE = macd.MACD.Last(2);
+            var Signal = macd.Signal.Last(1);
+            var PrevSignal = macd.Signal.Last(2);
+            
+            //Check for signal
+            if (MACDLine>Signal & PrevMACDLINE<PrevSignal & MACDLine<0 & Signal<0)
+            {
+                ExecuteMarketOrder(TradeType.Buy, SymbolName, 10000,"MACD" ,1.5*PrevATR, PrevATR);
+            } 
+            else if (MACDLine<Signal & PrevMACDLINE>PrevSignal & MACDLine>0 & Signal>0)
+            {
+                ExecuteMarketOrder(TradeType.Sell, SymbolName, 10000,"MACD" , 1.5*PrevATR, PrevATR);
+            }
+            
+        }
+        protected override void OnStop()
+        {
+            // Handle cBot stop here
+        }
+    }
+}

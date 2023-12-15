@@ -1,0 +1,180 @@
+import talib as ta
+import numpy as np
+
+# SSL/ Baseline
+maType = 'McGinley'
+length = 50
+source = close
+
+def ma(type, src, length):
+    result = np.zeros(len(src))
+    if type == 'McGinley':
+        mg = np.zeros(len(src))
+        te = ta.EMA(src, timeperiod=length)
+        mg = np.where(np.isnan(mg[1:]), te[1:], mg[1:] + (src[1:] - mg[1:]) / (length * (src[1:] / mg[1:])**4))
+        result[1:] = mg
+    return result
+
+BBMC = ma(maType, close, length)
+useTrueRange = True
+multy = 0.2
+Keltma = ma(maType, source, length)
+range_1 = np.where(useTrueRange, ta.TRANGE(high, low, close), high - low)
+rangema = ta.EMA(range_1, timeperiod=length)
+upperk = Keltma + rangema * multy
+lowerk = Keltma - rangema * multy
+
+smaHigh = ma(maType, high, length)
+smaLow = ma(maType, low, length)
+Hlv = np.zeros(len(close))
+for i in range(1, len(close)):
+    if close[i] > smaHigh[i]:
+        Hlv[i] = 1
+    elif close[i] < smaLow[i]:
+        Hlv[i] = -1
+    else:
+        Hlv[i] = Hlv[i-1]
+sslDown = np.where(Hlv < 0, smaHigh, smaLow)
+sslUp = np.where(Hlv < 0, smaLow, smaHigh)
+
+# EMA 1 & 2
+len1 = 10
+len2 = 21
+ema1 = ta.EMA(close, timeperiod=len1)
+ema2 = ta.EMA(close, timeperiod=len2)
+
+# Ema Cross
+mylong = np.where(ema1 > ema2, True, False)
+myshort = np.where(ema1 < ema2, True, False)
+
+first = ta.EMA(close, timeperiod=len1)
+sec = ta.EMA(close, timeperiod=len2)
+
+# Color Fill
+fcolor = np.where(first > sec, "#44a8eb", np.where(first < sec, "#D16C6C", "#cccccc"))
+
+# Ema Output
+F1 = np.where(turnon, first, np.nan)
+S2 = np.where(turnon, sec, np.nan)
+
+# Viscosity ATR
+vis_atr = 13
+vis_std = 20
+sed_atr = 40
+sed_std = 100
+
+dvsigfast = 12
+dvsigslow = 26
+dvsigsignal = 9
+
+underhline = -0.35
+threshold_level = 1.4
+lag_supressor = True
+
+sigtype = 'Zero crosses'
+
+showChargeExtreme = True
+colorbars = True
+showsignals = True
+
+c_s = 'Bright'
+greencolor = '#2DD204' if c_s == 'Bright' else '#699367' if c_s == 'Muted' else '#4974a5' if c_s == 'Soft' else '#39ff14'
+redcolor = '#D2042D' if c_s == 'Bright' else '#CB4C4E' if c_s == 'Muted' else '#ff4c50' if c_s == 'Soft' else '#ff073a'
+bluecolor = '#1e90ff' if c_s == 'Bright' else '#3a73b1' if c_s == 'Muted' else '#195cc0' if c_s == 'Soft' else '#4287f5'
+whitecolor = '#ffffff'
+blackcolor = '#000000'
+
+tsi_ma_long = 25
+tsi_ma_short = 13
+tsi_ma_signal = 7
+
+var_price = close
+
+hl2 = (high + low) / 2
+tsi = ta.TSI(var_price, tsi_ma_long, tsi_ma_short)
+tsis = ta.EMA(tsi, tsi_ma_signal)
+tsi_up = tsi > tsis
+tsi_dn = tsi < tsis
+tsi_n = (tsi > 0) & (tsis > 0)
+tsi_z = (tsi <= 0) & (tsis <= 0)
+
+rsi_length = 14
+rsi_1 = ta.RSI(close, timeperiod=rsi_length)
+rsi_source_1 = ta.RSI(var_price, timeperiod=rsi_length)
+rsi_source_2 = ta.RSI(tsi, timeperiod=rsi_length)
+
+histstd = ta.STDDEV(close, timeperiod=vis_std)
+macdvar = ta.MACD(close, fastperiod=dvsigfast, slowperiod=dvsigslow, signalperiod=dvsigsignal)
+dvo = ta.MACD(close, fastperiod=dvsigfast, slowperiod=dvsigslow, signalperiod=dvsigsignal)
+bb = ta.BBANDS(close, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
+rsilength = 14
+rsi1 = ta.RSI(close, timeperiod=rsilength)
+srcrsi2 = ta.RSI(high, timeperiod=rsilength)
+srcrsi3 = ta.RSI(low, timeperiod=rsilength)
+buysellvolume = ta.ADOSC(high, low, close, volume, fastperiod=3, slowperiod=10)
+
+srcrsi1 = ta.RSI(close, timeperiod=rsilength)
+srcrsi2 = ta.RSI(high, timeperiod=rsilength)
+srcrsi3 = ta.RSI(low, timeperiod=rsilength)
+
+std_1 = ta.STDDEV(close, timeperiod=sed_std)
+std_2 = ta.STDDEV(close, timeperiod=sed_atr)
+
+histst = ta.STDDEV(close, timeperiod=sed_std)
+mav3 = ta.EMA(close, timeperiod=13)
+dvs = ta.MACD(close, fastperiod=dvsigfast, slowperiod=dvsigslow, signalperiod=dvsigsignal)
+rsi2 = ta.RSI(high, timeperiod=rsilength)
+rsi3 = ta.RSI(low, timeperiod=rsilength)
+rsi_1 = ta.RSI(close, timeperiod=rsilength)
+pdm_1, ndm_1 = ta.PLUS_DM(high, low, timeperiod=14), ta.MINUS_DM(high, low, timeperiod=14)
+atr = ta.ATR(high, low, close, timeperiod=14)
+keltup = ta.EMA(close, timeperiod=10) + atr * 2
+keltdown = ta.EMA(close, timeperiod=10) - atr * 2
+ad = ta.AD(high, low, close, volume)
+dv = ta.DIV(high, low, close, volume)
+adx = ta.ADX(high, low, close, timeperiod=14)
+adxr = ta.ADXR(high, low, close, timeperiod=14)
+vawap = ta.WMA((high + low + close + close) / 4, timeperiod=8)
+    
+# Plotting
+if showChargeExtreme:
+    chargeColor = np.where(((dv + dv.shift(1)) / 2) > 0, greencolor, redcolor)
+    plotshape(((dv + dv.shift(1)) / 2) > 0 and dv > 0, style=shape.triangleup, location=location.belowbar, color=chargeColor, size=size.small, transp=0)
+    plotshape(((dv + dv.shift(1)) / 2) > 0 and dv < 0, style=shape.triangledown, location=location.abovebar, color=chargeColor, size=size.small, transp=0)
+
+if colorscheme == 'ColorBars' and colorbars:
+    barcolor(close > open ? (close[1] > open[1] ? greencolor : redcolor) : (close[1] > open[1] ? bluecolor : whitecolor))
+elif colorscheme == 'ColorFill' and colorbars
+    barcolor(fcolor)
+
+if signals and showsignals:
+    s1 = ta.RSI(close, timeperiod=14)
+    s2 = ta.RSI(close, timeperiod=8)
+    b1 = ta.RSI(close, timeperiod=21)
+    b2 = ta.RSI(close, timeperiod=14)
+    bs = s1 > 70 and s2 > 70 and b1 < 70 and b2 < 70 ? bs = -2 : na
+    ss = s1 < 30 and s2 < 30 and b1 > 30 and b2 > 30 ? bs = 2 : na
+    plot(bs, title='BuySellSignal 1', color=green, linewidth=2)
+    plot(ss, title='BuySellSignal -1', color=red, linewidth=2)
+
+plot(sslUp, color=green, linewidth=2)
+plot(sslDown, color=red, linewidth=2)
+plot(F1, color=blue, linewidth=1)
+plot(S2, color=red, linewidth=1)
+plot(upperk, color=green, linewidth=1)
+plot(lowerk, color=red, linewidth=1)
+plot(histstd, title="Viscosity", color=color.purple, linewidth=1)
+plot(macdvar[2], title="Histogram", color=macdvar[2] > macdvar[1] ? #26A65B : #E74C3C, style=plot.style_histogram, linewidth=4)
+
+plot(keltup, title="Kelthigh", color=red, linewidth=2)
+plot(keltdown, title="Keltlow", color=green, linewidth=2)
+plot(bb[0], title="BB upper", color=color.purple, linewidth=2)
+plot(bb[2], title="BB lower", color=color.purple, linewidth=2)
+plot(dvs[2], title="MACDHist", color=dvs[2] > dvs[2] ? #26A65B : #E74C3C, style=plot.style_histogram, linewidth=4)
+plot(tsi_z ? 1 : tsi_n ? 0 : na, title="TSI Zero", color=green, linewidth=2)
+plot(tsi_n ? 0 : tsi_z ? 1 : na, title="TSI Cross", color=red, linewidth=2)
+plot(rsi_source_1 > threshold_level ? 1 : rsi_source_1 < underhline ? -1 : 0, title="RSI1", color=color.red, linewidth=2)
+plot(rsi_source_2 > threshold_level ? 1 : rsi_source_2 < underhline ? -1 : 0, title="RSI2", color=color.red, linewidth=2)
+plot(adx > 25 ? adxr > 25 ? 0 : -1 : adxr > 25 ? 1 : na, title="ADX", color=color.red, linewidth=2)
+plot(vawap, title="Vawap", color=color.red, linewidth=2)
+plot(buysellvolume, title="Volume", color=buysellvolume > 0 ? green : red, style=plot.style_histogram, linewidth=1)

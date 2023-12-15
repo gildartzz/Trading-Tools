@@ -1,0 +1,30 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+def variant_ema(src, length):
+    alpha = 2 / (length + 1)
+    ema = np.zeros(len(src))
+    ema[0] = src[0]
+    for i in range(1, len(src)):
+        ema[i] = alpha * src[i] + (1 - alpha) * ema[i-1]
+    return ema
+
+def plot_with_bar_color(src, ema):
+    fig, ax = plt.subplots()
+    ax.plot(src, color='black', linewidth=2, label='Source')
+    ax.plot(ema, color='blue', linewidth=2, label='EMA')
+    
+    # Set bar colors based on EMA position relative to the source
+    bar_colors = np.where(src > ema, 'lime', 'red')
+    ax.bar(range(len(src)), src, color=bar_colors, alpha=0.7)
+    
+    ax.legend()
+    plt.show()
+
+# Example usage
+source_data = [10, 20, 30, 40, 50, 35, 25, 15, 30]
+length = 3
+ema_values = variant_ema(source_data, length)
+plot_with_bar_color(source_data, ema_values)

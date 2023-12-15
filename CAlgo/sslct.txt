@@ -1,0 +1,37 @@
+using System;
+using cAlgo.API;
+using cAlgo.API.Internals;
+using cAlgo.API.Indicators;
+using cAlgo.Indicators;
+
+namespace cAlgo
+{
+    [Indicator(IsOverlay = true, TimeZone = TimeZones.UTC, AccessRights = AccessRights.None)]
+    public class SSLmcg : Indicator
+    {
+        [Parameter("Period", DefaultValue = 10)]
+        public int Period { get; set; }
+
+        [Output("SSLDown", LineColor = "Red")]
+        public IndicatorDataSeries SslDown { get; set; }
+        [Output("SSLUp", LineColor = "Green")]
+        public IndicatorDataSeries SslUp { get; set; }
+
+        private McGinley mcgHigh, mcgLow;
+        private IndicatorDataSeries hlv;
+
+        protected override void Initialize()
+        {
+            mcgHigh = Indicators.GetIndicator<McGinley>(Bars.HighPrices,Period);
+            mcgLow = Indicators.GetIndicator<McGinley>(Bars.LowPrices,Period);
+            hlv = CreateDataSeries();
+        }
+
+        public override void Calculate(int index)
+        {
+            hlv[index] = Bars.ClosePrices[index] > mcgHigh.Result[index] ? 1 : Bars.ClosePrices[index] < mcgLow.Result[index] ? -1 : hlv[index - 1];
+            SslDown[index] = hlv[index] < 0 ? mcgHigh.Result[index] : mcgLow.Result[index];
+            SslUp[index] = hlv[index] < 0 ? mcgLow.Result[index] : mcgHigh.Result[index];
+        }
+    }
+}

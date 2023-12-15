@@ -1,0 +1,6 @@
+﻿[ChartParameters]
+Symbol = XAUUSD
+Timeframe = m5
+
+[cBotParameters]
+Parameter = 0

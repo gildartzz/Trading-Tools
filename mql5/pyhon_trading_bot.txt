@@ -1,0 +1,99 @@
+import ta as ta
+import ccxt
+import numpy as np
+import pandas as pd
+from ta.trend import macd, ema_indicator
+from ta.volatility import AverageTrueRange
+
+# Set up API credentials for your exchange (replace with your own values)
+exchange = ccxt.binance({
+    'apiKey': 'YOUR_API_KEY',
+    'secret': 'YOUR_API_SECRET',
+})
+
+# Set up trading parameters
+symbol = 'BTC/USDT'
+timeframe = '5m'
+stop_loss = 50  # in pips
+take_profit = 10  # in pips
+capital = 1000  # starting capital in USDT
+
+# Set up indicator parameters
+ssl_period = 10
+volatility_period = 20
+ema_period = 50
+
+def calculate_ssl_channel(df, period):
+    df['mcginley'] = ta.McGinleyDynamic(df['close'], period)
+    df['ssl_up'] = df['mcginley'] + df['atr'] * 1.5
+    df['ssl_down'] = df['mcginley'] - df['atr'] * 1.5
+    df['ssl_bullish'] = df['close'] > df['ssl_up']
+    df['ssl_bearish'] = df['close'] < df['ssl_down']
+    return df
+
+
+def calculate_damiani_volatmeter(df, period):
+    atr = AverageTrueRange(df['high'], df['low'], df['close'], period)
+    df['volatility'] = atr.average_true_range()
+    return df
+
+
+def calculate_ema_cross(df, short_period, long_period):
+    df['ema_short'] = ema_indicator(df['close'], short_period)
+    df['ema_long'] = ema_indicator(df['close'], long_period)
+    df['ema_bullish'] = df['ema_short'] > df['ema_long']
+    df['ema_bearish'] = df['ema_short'] < df['ema_long']
+    return df
+
+
+def generate_signals(df):
+    df['signal'] = np.where(
+        (df['ssl_bullish'] & df['ema_bullish']) | (df['ssl_bearish'] & df['ema_bearish']), 1, 0
+    )
+    df['signal'] = df['signal'].shift()
+    return df
+
+def run_trading_bot():
+    # Fetch historical data
+    data = exchange.fetch_ohlcv(symbol, timeframe)
+    df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+    df.set_index('timestamp', inplace=True)
+
+    # Calculate indicators
+    df = calculate_damiani_volatmeter(df, volatility_period)
+    df = calculate_ssl_channel(df, ssl_period)
+    df = calculate_ema_cross(df, 9, ema_period)
+
+    # Generate trading signals
+    df = generate_signals(df)
+
+    # Initialize trading variables
+    position = 0
+    entry_price = 0
+    stop_loss_price = 0
+    take_profit_price = 0
+    trades = 0
+
+    # Start trading
+    for i in range(1, len(df)):
+        if df['signal'].iloc[i] == 1 and position == 0:
+            entry_price = df['close'].iloc[i]
+            stop_loss_price = entry_price - (stop_loss * 0.0001)
+            take_profit_price = entry_price + (take_profit * 0.0001)
+            position = 1
+            trades += 1
+            print(f'Trade #{trades}: Buy at {entry_price}')
+
+        elif df['signal'].iloc[i] == 0 and position == 1:
+            exit_price = df['close'].iloc[i]
+            if exit_price <= stop_loss_price or exit_price >= take_profit_price:
+                capital = (capital / entry_price) * exit_price
+                position = 0
+                print(f'Trade #{trades}: Sell at {exit_price}')
+                print(f'Capital: {capital} USDT')
+
+    print('Backtesting completed.')
+
+
+run_trading_bot()

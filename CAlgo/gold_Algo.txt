@@ -1,0 +1,78 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using cAlgo.API;
+using cAlgo.API.Collections;
+using cAlgo.API.Indicators;
+using cAlgo.API.Internals;
+
+namespace cAlgo.Robots
+{
+    [Robot(TimeZone = TimeZones.UTC, AccessRights = AccessRights.FullAccess)]
+    public class SSLALGO : Robot
+    {
+        [Parameter(DefaultValue = 0.0)]
+        public double Parameter { get; set; }
+        
+        //Create indicator variables
+        private AverageTrueRange atr;
+        private SSLmcg ssl;
+        private MACROSS c2;
+        private DamianiVolatometer c3;
+
+        protected override void OnStart()
+        {
+            //Load indicators on startup
+            atr = Indicators.AverageTrueRange(14, MovingAverageType.Exponential);
+            ssl = Indicators.GetIndicator<SSLmcg>(50);
+            c2 = Indicators.GetIndicator<MACROSS>(MovingAverageType.Exponential, 20 , 10);
+            c3 = Indicators.GetIndicator<DamianiVolatometer>(13,50,1.3,true,MovingAverageType.Simple,Bars.ClosePrices);
+         }
+
+        protected override void OnBar()
+        {
+            //Calculate trade amount
+            var PrevATR = Math.Round(atr.Result.Last(1)/Symbol.PipSize);
+            var TradeAmount = (Account.Equity*0.05);
+            TradeAmount = Symbol.NormalizeVolumeInUnits(20, RoundingMode.Down);
+            
+            //Get currentPositions
+            var LongPosition = Positions.Find("SSL LONG");
+            var ShortPosition = Positions.Find("SSL SHORT");
+            
+            
+            //Two Line cross
+            var sslup = ssl.SslUp.Last(1);
+            var Prevsslup = ssl.SslUp.Last(2);
+            var ssldown = ssl.SslDown.Last(1);
+            var Prevssldown = ssl.SslDown.Last(2);
+            var emafast = c2.FastMAResult.Last(1);
+            var emaslow= c2.SlowMAResult.Last(1);
+            var Prevemaf = c2.FastMAResult.Last(2);
+            var Prevemas = c2.SlowMAResult.Last(2);
+            var lp = c3.lineP.Last(1);
+            var lm = c3.lineM.Last(1);
+  
+            //Check for signal
+            if (sslup>ssldown & Prevsslup<Prevssldown  & lp>lm & emafast>emaslow)
+            {
+                ExecuteMarketOrder(TradeType.Buy, SymbolName, TradeAmount,"SSL LONG" ,ssldown, 10);
+                if(ShortPosition!= null)
+                    ClosePosition(ShortPosition);
+            } 
+            else if (sslup<ssldown & Prevsslup>Prevssldown  & lp>lm & emafast<emaslow )
+            {
+                ExecuteMarketOrder(TradeType.Sell, SymbolName, TradeAmount,"SSL SHORT" , sslup, 10);
+                if(LongPosition!= null)
+                    ClosePosition(LongPosition);
+                      
+            }
+            
+        }
+        protected override void OnStop()
+        {
+            // Handle cBot stop here
+        }
+    }
+}

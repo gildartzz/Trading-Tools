@@ -1,0 +1,62 @@
+//+------------------------------------------------------------------+
+//|                                                    Trial_bot.mq5 |
+//|                                  Copyright 2023, MetaQuotes Ltd. |
+//|                                             https://www.mql5.com |
+//+------------------------------------------------------------------+
+#property copyright "Shanth Vidyababu"
+#property link      "https://www.mql5.com"
+#property version   "1.00"
+
+#include <Trade\Trade.mqh>             //Include MQL trde object functions
+CTrade   *Trade;                       //Declare trade as pointer to ctrade class
+
+//Setup Variables
+input int                        InpMagicNumber  = 2000001;       //unique identifier for this EA
+input string                     InpTradeComment = "_FILE_" ;        //optional comment for trades
+input ENUM_APPLIED_PRICE         InpAppliedPrice = PRICE_CLOSE;   // Applied price for indicators
+
+
+//Global variables
+int TicksReceivedCount  =  0;  //counts the number ofticks from the oninit function
+
+
+
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit()
+  {
+//---
+   //Declare magic number for all trades
+   Trade = new CTrade();
+   Trade.SetExpertMagicNumber(InpMagicNumber);
+//---
+   return(INIT_SUCCEEDED);
+  }
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+  {
+//---
+   
+  }
+//+------------------------------------------------------------------+
+//| Expert tick function                                             |
+//+------------------------------------------------------------------+
+void OnTick()
+  {
+//---
+   //Counts the number of ticks received
+   TicksReceivedCount++;
+   
+   Comment ("\n\rExpert:", InpMagicNumber, "\n\r",
+            "MT5 Server Time:", TimeCurrent(), "\n\r",
+            "Ticks Received",TicksReceivedCount,"\n\r\n\r",
+            "Symbols Traded:\n\r",
+            Symbol());
+   
+   
+   
+  }
+//+------------------------------------------------------------------+
