@@ -1,37 +1,110 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using cAlgo.API;
-using cAlgo.API.Internals;
+using cAlgo.API.Collections;
 using cAlgo.API.Indicators;
-using cAlgo.Indicators;
+using cAlgo.API.Internals;
 
-namespace cAlgo
+namespace cAlgo.Robots
 {
-    [Indicator(IsOverlay = true, TimeZone = TimeZones.UTC, AccessRights = AccessRights.None)]
-    public class SSLmcg : Indicator
+    [Robot(TimeZone = TimeZones.UTC, AccessRights = AccessRights.FullAccess)]
+    public class MA_VWAP : Robot
     {
-        [Parameter("Period", DefaultValue = 10)]
-        public int Period { get; set; }
+        [Parameter(DefaultValue = 0.0)]
+        public double Parameter { get; set; }
+        
+        //Create indicator variables
+        private AverageTrueRange atr;
+        private VWAP Vwap;
+        private MA_cross c2;
+        private V_stop c3;
+        private MacdCrossOver macd;
 
-        [Output("SSLDown", LineColor = "Red")]
-        public IndicatorDataSeries SslDown { get; set; }
-        [Output("SSLUp", LineColor = "Green")]
-        public IndicatorDataSeries SslUp { get; set; }
+        private bool tradeExecuted = false;
 
-        private McGinley mcgHigh, mcgLow;
-        private IndicatorDataSeries hlv;
 
-        protected override void Initialize()
+        protected override void OnStart()
         {
-            mcgHigh = Indicators.GetIndicator<McGinley>(Bars.HighPrices,Period);
-            mcgLow = Indicators.GetIndicator<McGinley>(Bars.LowPrices,Period);
-            hlv = CreateDataSeries();
+            //Load indicators on startup
+            atr = Indicators.AverageTrueRange(14, MovingAverageType.Exponential);
+            Vwap = Indicators.GetIndicator<VWAP>(Anchors.D1,1.0,2.0);
+            c2 = Indicators.GetIndicator<MA_cross>(20 ,10, MovingAverageType.Exponential);
+            c3 = Indicators.GetIndicator<V_stop>(true,40,48,3.0,MovingAverageType.Simple,1,MovingAverageType.WilderSmoothing);
+            macd = Indicators.MacdCrossOver(26,12,9);
+         }
+         
+
+        protected override void OnBar()
+        {
+            // Define the start and end times for the allowed trading interval
+            TimeSpan startTime = new TimeSpan(00, 30, 0);  // 8:00 AM
+            TimeSpan endTime = new TimeSpan(00, 00, 0);  // 4:00 PM
+
+            // Get the current server time
+            TimeSpan currentTime = Server.Time.TimeOfDay;
+
+            // Check if the current time is within the allowed trading interval
+            if (currentTime >= startTime && currentTime <= endTime)
+            {
+                // Trading is allowed within the specified interval
+
+                // Calculate trade amount
+                var PrevATR = Math.Round(atr.Result.Last(1) / Symbol.PipSize);
+                var TradeAmount = (Account.Equity * 0.05);
+                TradeAmount = Symbol.NormalizeVolumeInUnits(1000, RoundingMode.Down);
+
+                // Get current positions
+                var LongPosition = Positions.Find("SSL LONG");
+                var ShortPosition = Positions.Find("SSL SHORT");
+
+               //Two Line cross
+                var up = Bars.ClosePrices.Last(0);
+                var Prevup = Bars.ClosePrices.Last(1);
+                var down = Vwap.Vwap.Last(0);
+                var Prevsdown = Vwap.Vwap.Last(1);
+                var emafast = c2.FastMa.Result.Last(0);
+                var emaslow= c2.SlowMa.Result.Last(0);
+                var Prevemaf = c2.FastMa.Result.Last(1);
+                var Prevemas = c2.SlowMa.Result.Last(1);
+                var vs = c3.outLSR[c3.outLSR.Count - 1];
+                var signal_line = macd.Signal.Last(0);
+                var macd_line = macd.MACD.Last(0);
+                //var lm = c3.lineM.Last(1);
+
+                // Check if a trade has already been executed in the current tick
+                if (tradeExecuted)
+                {
+                    return; // Exit the OnBar() method to prevent additional trade execution
+                }
+
+                // Check for signal and execute trades based on your conditions
+                if (emafast>emaslow & Prevemaf<Prevemas & up>down & macd_line>signal_line ) //& emafast>emaslow & vs<up) 
+                {
+                    ExecuteMarketOrder(TradeType.Buy, SymbolName, TradeAmount, "SSL LONG",25, 15);
+                    if (ShortPosition != null)
+                        ClosePosition(ShortPosition);
+
+                    tradeExecuted = true; // Set the tradeExecuted flag to true
+                }
+                else if (emafast<emaslow & Prevemaf>Prevemas & up<down & macd_line<signal_line)//& emafast<emaslow & vs>up)
+                {
+                    ExecuteMarketOrder(TradeType.Sell, SymbolName, TradeAmount, "SSL SHORT", 25, 15);
+                    if (LongPosition != null)
+                        ClosePosition(LongPosition);
+
+                    tradeExecuted = true; // Set the tradeExecuted flag to true
+                }
+            }
+            else
+            {
+                tradeExecuted = false; // Reset the tradeExecuted flag if outside the allowed trading interval
+            }
         }
-
-        public override void Calculate(int index)
+        protected override void OnStop()
         {
-            hlv[index] = Bars.ClosePrices[index] > mcgHigh.Result[index] ? 1 : Bars.ClosePrices[index] < mcgLow.Result[index] ? -1 : hlv[index - 1];
-            SslDown[index] = hlv[index] < 0 ? mcgHigh.Result[index] : mcgLow.Result[index];
-            SslUp[index] = hlv[index] < 0 ? mcgLow.Result[index] : mcgHigh.Result[index];
+            // Handle cBot stop here
         }
     }
 }
