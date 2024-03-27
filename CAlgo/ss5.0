@@ -1,0 +1,75 @@
+using System;
+using cAlgo.API;
+using cAlgo.API.Indicators;
+using cAlgo.API.Internals;
+
+namespace cAlgo.Robots
+{
+    [Robot(TimeZone = TimeZones.UTC, AccessRights = AccessRights.None)]
+    public class SignalBasedBot : Robot
+    {
+        [Parameter("Fast MA Period", DefaultValue = 20)]
+        public int FastMaPeriod { get; set; }
+
+        [Parameter("Slow MA Period", DefaultValue = 10)]
+        public int SlowMaPeriod { get; set; }
+
+        [Parameter("Quantity (Lots)", DefaultValue = 0.01)]
+        public double QuantityInLots { get; set; }
+
+        [Parameter("Take Profit (Pips)", DefaultValue = 10)]
+        public double TakeProfitPips { get; set; }
+
+        [Parameter("Stop Loss (Pips)", DefaultValue = 10)]
+        public double StopLossPips { get; set; }
+
+        private MovingAverage fastMa;
+        private MovingAverage slowMa;
+        private VWAP vwap;
+        private V_stop vStop;
+        private MacdCrossOver macd;
+
+        protected override void OnStart()
+        {
+            fastMa = Indicators.MovingAverage(Bars.ClosePrices, FastMaPeriod, MovingAverageType.Exponential);
+            slowMa = Indicators.MovingAverage(Bars.ClosePrices, SlowMaPeriod, MovingAverageType.Exponential);
+            vwap = Indicators.GetIndicator<VWAP>(Anchors.D1, 1.0, 2.0);
+            vStop = Indicators.GetIndicator<V_stop>(true, 40, 48, 3.0, MovingAverageType.Simple, 1, MovingAverageType.WilderSmoothing);
+            macd = Indicators.MacdCrossOver(26, 12, 9);
+        }
+
+        protected override void OnBar()
+        {
+            int index = Bars.ClosePrices.Count - 1;
+            double currentClose = Bars.ClosePrices[index];
+            double previousClose = Bars.ClosePrices[index - 1];
+            double currentVwap = vwap.Vwap.Last(0);
+            double previousVwap = vwap.Vwap.Last(1);
+            double currentVStop = vStop.outLSR[vStop.outLSR.Count - 1];
+            double emafast = fastMa.Result[index];
+            double emaslow = slowMa.Result[index];
+            double signal_line = macd.Signal.Last(0);
+            double macd_line = macd.MACD.Last(0);
+
+            bool isBullishCrossVwap = previousClose < previousVwap && currentClose > currentVwap;
+            bool isBearishCrossVwap = previousClose > previousVwap && currentClose < currentVwap;
+            bool isMacdBuy = macd_line > signal_line;
+            bool isMacdSell = macd_line < signal_line;
+            
+            ExecuteOrder(isBullishCrossVwap && isMacdBuy, isBearishCrossVwap && isMacdSell);
+        }
+
+        private void ExecuteOrder(bool buySignal, bool sellSignal)
+        {
+            var volumeInUnits = Symbol.QuantityToVolumeInUnits(QuantityInLots);
+            if (buySignal)
+            {
+                ExecuteMarketOrder(TradeType.Buy, SymbolName, volumeInUnits, "BuyOrder", StopLossPips, TakeProfitPips);
+            }
+            else if (sellSignal)
+            {
+                ExecuteMarketOrder(TradeType.Sell, SymbolName, volumeInUnits, "SellOrder", StopLossPips, TakeProfitPips);
+            }
+        }
+    }
+}
